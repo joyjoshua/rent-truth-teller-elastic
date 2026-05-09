@@ -1,0 +1,32 @@
+{
+  "mappings": {
+    "properties": {
+      "listing_id": { "type": "keyword" },
+      "locality": { "type": "keyword" },
+      "micro_market": { "type": "keyword" },
+      "zone": { "type": "keyword" },
+      "bhk": { "type": "integer" },
+      "furnishing": { "type": "keyword" },
+      "rent_inr": { "type": "integer" },
+      "deposit_inr": { "type": "integer" },
+      "deposit_months": { "type": "float" },
+      "area_sqft": { "type": "integer" },
+      "rent_per_sqft": { "type": "float" },
+      "listed_date": { "type": "date" },
+      "description": {
+        "type": "text",
+        "copy_to": "description_semantic"
+      },
+      "description_semantic": {
+        "type": "semantic_text",
+        "inference_id": ".elser-2-elasticsearch"
+      },
+      "location": { "type": "geo_point" },
+      "source_url": { "type": "keyword" },
+      "publisher": { "type": "keyword" },
+      "retrieved_at": { "type": "date" },
+      "license": { "type": "keyword" },
+      "doc_id": { "type": "keyword" }
+    }
+  }
+}

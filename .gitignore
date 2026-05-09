@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Raw Kaggle download (see data/raw/README.md)
+data/raw/*.csv
+
+# Generated processed data (regenerate with ingest/normalize_and_enrich.py)
+data/processed/*.jsonl
