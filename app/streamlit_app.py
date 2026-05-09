@@ -11,29 +11,22 @@ load_dotenv(os.path.join(ROOT, ".env"))
 
 from agent.agent import bedrock, run_agent
 from app.rent_viz import render_rent_explorer
+from app.ui_theme import inject_apple_dark_theme, render_hero, section_title
 
 BEDROCK_MODEL = (os.getenv("BEDROCK_MODEL_ID") or "us.anthropic.claude-sonnet-4-20250514-v1:0").strip()
 
-TAB_CHAT = "💬 Chat"
-TAB_MAP = "🗺️ Map & charts"
+TAB_CHAT = "Chat"
+TAB_MAP = "Map & charts"
 
-st.set_page_config(page_title="Rental Truth-Teller", page_icon="🏠", layout="wide")
-st.title("🏠 Bengaluru Rental Truth-Teller")
-st.caption("The second opinion your broker doesn't want you to have.")
-
-# Tab-style navigation (horizontal radio syncs with sidebar; native st.tabs runs every panel each rerun)
-st.markdown(
-    """
-<style>
-div[data-testid="stRadio"] > div {
-    flex-direction: row !important;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-}
-</style>
-""",
-    unsafe_allow_html=True,
+st.set_page_config(
+    page_title="Rental Truth-Teller",
+    page_icon="🏠",
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
+inject_apple_dark_theme()
+render_hero()
+
 main_view = st.radio(
     "View",
     [TAB_CHAT, TAB_MAP],
@@ -44,7 +37,7 @@ main_view = st.radio(
 
 with st.sidebar:
     if main_view == TAB_CHAT:
-        st.header("Try these queries")
+        section_title("Suggested prompts")
         examples = [
             "Is ₹35,000 fair for a 2BHK in Koramangala?",
             "Broker wants 8 months deposit for a 1BHK in HSR at ₹22,000",
@@ -56,14 +49,18 @@ with st.sidebar:
             if st.button(ex, key=ex, use_container_width=True):
                 st.session_state["prefill"] = ex
     else:
-        st.markdown("### Explore")
-        st.caption("Suggested questions are on the **Chat** tab.")
+        section_title("Explore")
+        st.caption("Switch to **Chat** for suggested questions.")
 
     st.divider()
-    st.markdown("**Data source:** Kaggle Bengaluru rental listings")
-    st.markdown("**Powered by:** Elasticsearch + AWS Bedrock (Claude)")
-    st.markdown("---")
-    st.caption("⚠️ Data is from public datasets. Not financial or legal advice.")
+    section_title("About")
+    st.caption("Data: Kaggle Bengaluru rental listings")
+    st.caption("Stack: Elasticsearch · AWS Bedrock (Claude)")
+    st.divider()
+    st.caption(
+        "Informational only — not financial or legal advice. "
+        "Verify listings and terms independently."
+    )
 
 
 def bedrock_verdict(agent_response: str, user_query: str) -> str | None:
@@ -75,7 +72,7 @@ def bedrock_verdict(agent_response: str, user_query: str) -> str | None:
 User's question: {user_query}
 Agent's analysis: {agent_response}
 
-Respond with ONLY the verdict, starting with "🏷️ Renter's Verdict:"."""
+Respond with ONLY the verdict, starting with "Renter's Verdict:"."""
 
         response = bedrock.converse(
             modelId=BEDROCK_MODEL,
@@ -101,7 +98,7 @@ else:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    if prompt := st.chat_input("Ask about Bengaluru rentals..."):
+    if prompt := st.chat_input("Ask about Bengaluru rentals…"):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
@@ -114,7 +111,7 @@ else:
             or st.session_state.messages[-2]["role"] != "assistant"
         ):
             with st.chat_message("assistant"):
-                with st.spinner("Searching rental data..."):
+                with st.spinner("Searching rental data…"):
                     try:
                         answer = run_agent(user_msg)
 
@@ -132,7 +129,7 @@ else:
                         )
 
                     except Exception as e:
-                        error_msg = f"⚠️ Something went wrong. Error: {str(e)}"
+                        error_msg = f"Something went wrong. Error: {str(e)}"
                         st.error(error_msg)
                         st.session_state.messages.append(
                             {"role": "assistant", "content": error_msg}

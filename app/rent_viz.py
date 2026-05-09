@@ -9,6 +9,7 @@ from pathlib import Path
 
 import folium
 import pandas as pd
+from branca.element import Element
 from dotenv import load_dotenv
 from elasticsearch import Elasticsearch
 from streamlit_folium import st_folium
@@ -75,16 +76,72 @@ def assign_rent_tiers(median_rents: pd.Series) -> pd.Series:
     return median_rents.apply(tier)
 
 
+# Apple system–like semantic greens / yellows / reds (dark-mode friendly on dark tiles).
 TIER_STYLE = {
-    "Lower rent": {"color": "#1e8449", "fill": "#27ae60"},
-    "Mid rent": {"color": "#b7950b", "fill": "#f4d03f"},
-    "Higher rent": {"color": "#922b21", "fill": "#e74c3c"},
+    "Lower rent": {"color": "#248a3d", "fill": "#30d158"},
+    "Mid rent": {"color": "#c9a227", "fill": "#ffd60a"},
+    "Higher rent": {"color": "#c93434", "fill": "#ff453a"},
 }
+
+
+def _leaflet_dark_ui_styles() -> str:
+    """Leaflet defaults use white tooltip/popup chrome; force dark surfaces + contrast."""
+    return """
+<style>
+.leaflet-tooltip {
+    background-color: #1c1c1e !important;
+    background: #1c1c1e !important;
+    color: #f5f5f7 !important;
+    border: 1px solid rgba(84, 84, 88, 0.9) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55) !important;
+    padding: 10px 12px !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif !important;
+}
+.leaflet-tooltip-top:before {
+    border-top-color: #1c1c1e !important;
+}
+.leaflet-tooltip-bottom:before {
+    border-bottom-color: #1c1c1e !important;
+}
+.leaflet-tooltip-left:before {
+    border-left-color: #1c1c1e !important;
+}
+.leaflet-tooltip-right:before {
+    border-right-color: #1c1c1e !important;
+}
+.leaflet-popup-content-wrapper {
+    background: #1c1c1e !important;
+    color: #f5f5f7 !important;
+    border-radius: 12px !important;
+    border: 1px solid rgba(84, 84, 88, 0.65) !important;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55) !important;
+}
+.leaflet-popup-content {
+    margin: 12px 14px !important;
+    color: #f5f5f7 !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif !important;
+    font-size: 13px !important;
+    line-height: 1.45 !important;
+}
+.leaflet-popup-tip {
+    background: #1c1c1e !important;
+    box-shadow: none !important;
+}
+.leaflet-container a.leaflet-popup-close-button {
+    color: rgba(235, 235, 245, 0.55) !important;
+}
+.leaflet-container a.leaflet-popup-close-button:hover {
+    color: #f5f5f7 !important;
+}
+</style>
+"""
 
 
 def build_folium_map(df: pd.DataFrame) -> folium.Map:
     center_lat, center_lon = 12.9716, 77.5946
-    m = folium.Map(location=[center_lat, center_lon], zoom_start=11, tiles="CartoDB positron")
+    m = folium.Map(location=[center_lat, center_lon], zoom_start=11, tiles="CartoDB dark_matter")
+    m.get_root().header.add_child(Element(_leaflet_dark_ui_styles()))
 
     for _, row in df.iterrows():
         tier = row["tier"]
@@ -94,11 +151,14 @@ def build_folium_map(df: pd.DataFrame) -> folium.Map:
         label = escape(str(row["micro_market"]))
         radius = max(6, min(28, 8 + cnt**0.5 * 2))
 
+        # Explicit colors + bg so text stays readable even if map CSS load order differs.
         tip = (
-            f"<div style='font-size:13px'><b>{label}</b><br/>"
-            f"Median rent: ₹{rent:,.0f}/mo<br/>"
-            f"Listings (aggregate rows): {cnt}<br/>"
-            f"<span style='color:#555'>{tier}</span></div>"
+            "<div style=\"background:#1c1c1e;color:#f5f5f7;font-size:13px;line-height:1.45;"
+            "padding:4px 2px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif\">"
+            f"<strong style=\"color:#ffffff\">{label}</strong><br/>"
+            f"<span style=\"color:#ebebf5\">Median rent: ₹{rent:,.0f}/mo</span><br/>"
+            f"<span style=\"color:#ebebf5\">Listings (aggregate rows): {cnt}</span><br/>"
+            f"<span style=\"color:rgba(235,235,245,0.58)\">{tier}</span></div>"
         )
 
         folium.CircleMarker(
@@ -108,7 +168,7 @@ def build_folium_map(df: pd.DataFrame) -> folium.Map:
             weight=2,
             fill=True,
             fill_color=style["fill"],
-            fill_opacity=0.72,
+            fill_opacity=0.78,
             tooltip=folium.Tooltip(tip, sticky=True),
         ).add_to(m)
 
@@ -119,8 +179,8 @@ def _render_rent_explorer_body(st_module) -> None:
     """Core map + charts (no wrapper)."""
     st = st_module
     st.caption(
-        "Markers use **approximate locality centers** from `data/locality_coords.json`. "
-        "Median rent comes from your **baseline Elasticsearch index** (aggregated rows)."
+        "Markers use approximate locality centers from locality_coords.json. "
+        "Median rent is aggregated from your baseline Elasticsearch index."
     )
 
     client = _es_client()
@@ -171,28 +231,43 @@ def _render_rent_explorer_body(st_module) -> None:
     col_map, col_legend = st.columns([3, 1])
     with col_map:
         st.markdown(
-            "**Map** — greener ≈ lower median rent, redder ≈ higher (within this dataset). Hover tooltips show detail."
+            '<p style="margin:0 0 0.5rem 0;color:rgba(235,235,245,0.72);font-size:0.95rem">'
+            "<strong style=\"color:rgba(255,255,255,0.9)\">Map</strong> — greener is lower median "
+            "rent within this dataset; redder is higher. Hover for detail.</p>",
+            unsafe_allow_html=True,
         )
         fmap = build_folium_map(merged)
         st_folium(fmap, width=None, height=420, returned_objects=[])
 
     with col_legend:
-        st.markdown("**Legend**")
+        st.markdown(
+            '<p style="margin:0 0 0.35rem 0;font-weight:600;color:rgba(255,255,255,0.9)">Legend</p>',
+            unsafe_allow_html=True,
+        )
         for tier, spec in TIER_STYLE.items():
             st.markdown(
                 f"<span style='display:inline-block;width:14px;height:14px;"
                 f"background:{spec['fill']};border:2px solid {spec['color']};"
-                f"border-radius:50%;vertical-align:middle;margin-right:6px'></span> {tier}",
+                f"border-radius:50%;vertical-align:middle;margin-right:8px'></span>"
+                f"<span style='color:rgba(235,235,245,0.85)'>{tier}</span>",
                 unsafe_allow_html=True,
             )
 
-    st.markdown("**Top 15 areas by median rent**")
+    st.markdown(
+        '<p style="margin:1rem 0 0.5rem 0;font-weight:600;color:rgba(255,255,255,0.9)">'
+        "Top 15 areas by median rent</p>",
+        unsafe_allow_html=True,
+    )
     top = merged.nlargest(15, "median_rent")[["micro_market", "median_rent"]].set_index(
         "micro_market"
     )
     st.bar_chart(top)
 
-    st.markdown("**Table — matched areas**")
+    st.markdown(
+        '<p style="margin:1rem 0 0.5rem 0;font-weight:600;color:rgba(255,255,255,0.9)">'
+        "Matched areas</p>",
+        unsafe_allow_html=True,
+    )
     show = merged.sort_values("median_rent", ascending=False)[
         ["micro_market", "median_rent", "listing_count", "tier"]
     ]
@@ -205,7 +280,15 @@ def render_rent_explorer(st_module, *, standalone: bool = False) -> None:
     """
     st = st_module
     if standalone:
-        st.subheader("🗺️ Bengaluru median rent — map & charts")
+        st.markdown(
+            '<p style="font-size:1.35rem;font-weight:600;letter-spacing:-0.02em;'
+            'margin:0 0 0.25rem 0;color:rgba(255,255,255,0.92)">'
+            "Median rent by area</p>"
+            '<p style="margin:0;color:rgba(235,235,245,0.55);font-size:0.95rem">'
+            "Map and charts from your baseline index</p>",
+            unsafe_allow_html=True,
+        )
+        st.markdown("")
         _render_rent_explorer_body(st)
         return
 
