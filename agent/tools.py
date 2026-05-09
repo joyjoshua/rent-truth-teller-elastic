@@ -57,6 +57,7 @@ def get_price_benchmark(locality: str, bhk: int) -> dict:
     query = f"""
         FROM blr-rentals
         | WHERE micro_market == "{locality}" AND bhk == {bhk}
+        | LIMIT 10000
         | STATS median_rent = MEDIAN(rent_inr),
                 p25_rent = PERCENTILE(rent_inr, 25),
                 p75_rent = PERCENTILE(rent_inr, 75),
@@ -76,6 +77,7 @@ def check_deposit_norm(locality: str, bhk: int) -> dict:
     query = f"""
         FROM blr-rentals
         | WHERE micro_market == "{locality}" AND bhk == {bhk}
+        | LIMIT 10000
         | STATS median_deposit = MEDIAN(deposit_months),
                 avg_deposit = AVG(deposit_months),
                 max_deposit = MAX(deposit_months),
@@ -95,6 +97,7 @@ def compare_neighbourhoods(area_a: str, area_b: str) -> dict:
     query = f"""
         FROM blr-rentals
         | WHERE micro_market == "{area_a}" OR micro_market == "{area_b}"
+        | LIMIT 10000
         | STATS median_rent = MEDIAN(rent_inr),
                 median_deposit = MEDIAN(deposit_months),
                 avg_sqft = AVG(area_sqft),

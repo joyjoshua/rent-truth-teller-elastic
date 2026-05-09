@@ -2,10 +2,22 @@
 
 import json
 import os
+import sys
 from pathlib import Path
 
 import boto3
 from dotenv import load_dotenv
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+if hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 from agent.aws_bedrock_env import apply_bedrock_client_env, bedrock_bearer_token
 from agent.tool_definitions import TOOLS
@@ -51,6 +63,8 @@ def _bedrock_client():
 
 bedrock = _bedrock_client()
 
+_MAX_AGENT_LOOPS = 24
+
 
 def run_agent(user_message: str, conversation_history: list | None = None) -> str:
     """
@@ -62,7 +76,7 @@ def run_agent(user_message: str, conversation_history: list | None = None) -> st
     messages = conversation_history.copy() if conversation_history else []
     messages.append({"role": "user", "content": [{"text": user_message}]})
 
-    while True:
+    for _ in range(_MAX_AGENT_LOOPS):
         response = bedrock.converse(
             modelId=MODEL_ID,
             system=[{"text": SYSTEM_PROMPT}],
@@ -116,3 +130,5 @@ def run_agent(user_message: str, conversation_history: list | None = None) -> st
 
         else:
             return "Unexpected response from the model. Please try again."
+
+    return "Stopped after too many tool rounds — please narrow your question or try again."
